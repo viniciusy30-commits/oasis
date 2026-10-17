@@ -1,5 +1,7 @@
-#id 2026-10-17-b
-#titulo Novas animações do personagem
-- Animações do addon Actions And Stuff: andar, correr, andar de costas, pular, cair, aterrissar e nadar
-- Agachar com Shift (fica mais lento) com animação de agachar e andar agachado
-- Transição suave entre as animações e movimento de respiração parado
+#id 2026-10-17-c
+#titulo Animações corrigidas + blocos e itens do Actions And Stuff
+- Animações refeitas: cabeça presa ao corpo, movimentos fluidos, pose de voo, nado, agachar com Shift
+- Mais de 400 blocos novos (plantas, flores, minérios, lãs, concretos e mais) e 700+ itens
+- Inventário com abas Blocos/Itens e busca por nome
+- Itens aparecem 3D na mão; plantas e flores nascem no mundo
+- Texturas dos blocos originais agora vêm do pacote

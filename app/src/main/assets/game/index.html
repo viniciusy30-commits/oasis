@@ -41,6 +41,8 @@ canvas#gl{position:fixed;z-index:1;inset:0;width:100%;height:100%;display:block}
 .mb{display:block;width:100%;margin:7px 0;padding:12px;border:0;border-radius:10px;background:#2e6b4a;color:#fff;font-size:16px;font-weight:600}
 .mb:active{background:#3f8f64}.mb.alt{background:#27455a}.mb.red{background:#7a2e2e}
 input[type=range]{width:55%;touch-action:pan-x}
+#invQ{width:100%;padding:10px;margin:4px 0;border-radius:8px;border:2px solid #2e6b4a;background:#0b1a12;color:#fff;font-size:15px;user-select:text;-webkit-user-select:text;touch-action:auto}
+#grid .slot{cursor:pointer}
 #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px;margin-top:8px}
 #grid .slot{width:100%;height:54px}
 #grid .slot canvas{width:40px;height:40px}
@@ -68,7 +70,7 @@ input[type=range]{width:55%;touch-action:pan-x}
   <div class="btn" id="bJump">▲</div>
   <div id="hotbar"></div>
 </div>
-<div class="panel" id="invP"><div class="card"><h2>Inventário</h2><div id="grid"></div><button class="mb alt" id="invClose">Fechar</button></div></div>
+<div class="panel" id="invP"><div class="card" id="invCard"><h2>Inventário</h2><div class="row" style="margin:4px 0"><button class="mb" id="tabB" style="margin:0;padding:8px">Blocos</button><button class="mb alt" id="tabI" style="margin:0;padding:8px">Itens</button></div><input id="invQ" type="text" placeholder="Buscar…" autocomplete="off"><div id="grid"></div><button class="mb alt" id="invClose">Fechar</button></div></div>
 <div class="panel" id="menuP"><div class="card">
   <h2>Oasis — Pausado</h2>
   <button class="mb" id="mResume">Continuar</button>
@@ -78,7 +80,7 @@ input[type=range]{width:55%;touch-action:pan-x}
   <div class="row"><span>Volume</span><input type="range" id="vol" min="0" max="1" step="0.05"></div>
   <div class="row"><span>Inverter olhar (Y)</span><button class="mb alt" id="mInv" style="width:35%;margin:0"></button></div>
   <button class="mb alt" id="mTex">Importar texturas (.mcpack / .zip)</button>
-  <button class="mb alt" id="mTexReset">Voltar às texturas originais do Oasis</button>
+  <button class="mb alt" id="mTexReset">Remover texturas importadas</button>
   <button class="mb alt" id="mUpd">Verificar atualização</button>
   <button class="mb alt" id="mNews">O que mudou</button>
   <button class="mb red" id="mNew">Novo mundo</button>
@@ -88,8 +90,10 @@ input[type=range]{width:55%;touch-action:pan-x}
 <input type="file" id="file" style="display:none">
 <div id="load"><h1>OASIS</h1><div id="lt">Gerando mundo…</div><div id="bar"><i></i></div></div>
 <div id="err"></div>
+<script src="texpack.js"></script>
 <script>
 'use strict';
+if(typeof TP==="undefined")window.TP={cols:64,h:512,start:64,blocks:[],items:[],orig:{},atlas:""};
 const $=id=>document.getElementById(id);
 window.onerror=(m,s,l)=>{const e=$('err');e.style.display='block';e.textContent='Erro: '+m+' ('+l+')'};
 const CH=16,H=64,SEA=22,PI=Math.PI;
@@ -108,7 +112,7 @@ function rnd(seed){let s=seed|0;return()=>{s=Math.imul(s^(s>>>15),2246822507)+10
 /* ---------- texturas do atlas (desenhadas no código) ---------- */
 const TN=[];const TI={};
 function T(n){if(!(n in TI)){TI[n]=TN.length;TN.push(n)}return TI[n]}
-const atlas=document.createElement('canvas');atlas.width=256;atlas.height=256;
+const atlas=document.createElement('canvas');const AW=64,AWPX=AW*16;atlas.width=AWPX;atlas.height=TP.h||512;
 const actx=atlas.getContext('2d');
 const rgb=(r,g,b,a)=>'rgba('+(r|0)+','+(g|0)+','+(b|0)+','+(a===undefined?1:a)+')';
 function noisy(c,base,v,seed,skip){const r=rnd(seed);for(let y=0;y<16;y++)for(let x=0;x<16;x++){if(skip&&skip(x,y))continue;const k=1+(r()-.5)*v;c.fillStyle=rgb(base[0]*k,base[1]*k,base[2]*k);c.fillRect(x,y,1,1)}}
@@ -147,10 +151,12 @@ PROC.coal=ore([30,30,30]);PROC.iron=ore([215,170,140]);PROC.gold=ore([250,220,60
 Object.keys(PROC).forEach(T);
 const tcanvas={};
 function makeTile(n){const cv=document.createElement('canvas');cv.width=16;cv.height=16;const c=cv.getContext('2d');PROC[n](c);return cv}
-function paintAtlas(over){TN.forEach((n,i)=>{const x=(i%16)*16,y=(i/16|0)*16;actx.clearRect(x,y,16,16);const src=(over&&over[n])||tcanvas[n]||(tcanvas[n]=makeTile(n));actx.imageSmoothingEnabled=false;actx.drawImage(src,0,0,src.width,src.height,x,y,16,16)})}
+const PACKO={};let packImg=null;
+function paintAtlas(over){TN.forEach((n,i)=>{const x=(i%AW)*16,y=(i/AW|0)*16;actx.clearRect(x,y,16,16);const src=(over&&over[n])||PACKO[n]||tcanvas[n]||(tcanvas[n]=makeTile(n));actx.imageSmoothingEnabled=false;actx.drawImage(src,0,0,src.width,src.height,x,y,16,16)});
+ actx.clearRect(0,16,atlas.width,atlas.height-16);if(packImg)actx.drawImage(packImg,0,0)}
 paintAtlas();
 /* ---------- blocos ---------- */
-const NB=24;const SOLID=new Uint8Array(NB),OPQ=new Uint8Array(NB),LIQ=new Uint8Array(NB),HARD=new Float32Array(NB),TILES=[],BNAME=[],DROP=[];
+const NB=4096,IT0=2048;const FANCY=new Uint8Array(NB),CROSS=new Uint8Array(NB),ITILE=[];const SOLID=new Uint8Array(NB),OPQ=new Uint8Array(NB),LIQ=new Uint8Array(NB),HARD=new Float32Array(NB),TILES=[],BNAME=[],DROP=[];
 function def(id,name,tiles,hard,o){o=o||{};BNAME[id]=name;HARD[id]=hard;DROP[id]=o.drop||id;SOLID[id]=o.solid===false?0:1;OPQ[id]=o.opq===false?0:1;LIQ[id]=o.liq?1:0;
  const t=tiles.map(T);TILES[id]=t.length===1?[t[0],t[0],t[0],t[0],t[0],t[0]]:t.length===3?[t[1],t[1],t[0],t[2],t[1],t[1]]:t.length===4?[t[1],t[1],t[0],t[2],t[3],t[1]]:t}
 const AIR=0,GRASS=1,DIRT=2,STONE=3,COBBLE=4,SAND=5,LOG=6,LEAVES=7,PLANKS=8,GLASS=9,WATER=10,BEDROCK=11,COAL=12,IRON=13,GOLD=14,DIAMOND=15,GRAVEL=16,CRAFT=17,FURNACE=18,BRICK=19,TNT=20,SNOW=21,CACTUS=22,GLOW=23;
@@ -176,14 +182,29 @@ def(CACTUS,'Cacto',['cactus_top','cactus_side','cactus_top'],.4);
 def(GLOW,'Glowstone',['glow'],.4);
 /* tiles[]: [+x,-x,+y,-y,+z,-z]; 4 tiles = top,side,bottom,front(+z) */
 const PLACEABLE=[GRASS,DIRT,STONE,COBBLE,SAND,LOG,LEAVES,PLANKS,GLASS,GRAVEL,BRICK,CRAFT,FURNACE,TNT,SNOW,CACTUS,GLOW,COAL,IRON,GOLD,DIAMOND,BEDROCK,WATER];
+
+/* ---------- blocos e itens do pacote Actions And Stuff ---------- */
+const ITEMLIST=[];
+(function(){
+ const have=new Set(BNAME.filter(Boolean));let id=24;
+ const defIdx=(id,name,t,hd,fl)=>{BNAME[id]=name;HARD[id]=hd;DROP[id]=id;const cut=fl&1,cross=fl&2;SOLID[id]=cross?0:1;OPQ[id]=(cut||cross)?0:1;LIQ[id]=0;FANCY[id]=/^Folhas|^Raízes de Mangue$/.test(name)?1:0;CROSS[id]=cross?1:0;
+  TILES[id]=t.length===1?[t[0],t[0],t[0],t[0],t[0],t[0]]:t.length===3?[t[1],t[1],t[0],t[2],t[1],t[1]]:t.length===4?[t[1],t[1],t[0],t[2],t[3],t[1]]:t;PLACEABLE.push(id)};
+ TP.blocks.forEach(b=>{if(have.has(b[0])||id>=IT0)return;have.add(b[0]);defIdx(id++,b[0],b[1],b[3]<0?-1:b[3],b[2])});
+ TP.items.forEach((it,i)=>{const k=IT0+i;BNAME[k]=it[0];ITILE[k]=it[1];TILES[k]=[it[1],it[1],it[1],it[1],it[1],it[1]];HARD[k]=0;DROP[k]=k;ITEMLIST.push(k)});
+})();
+const ISITEM=id=>id>=IT0,ISFLAT=id=>id>=IT0||CROSS[id]===1;
 /* ---------- mundo ---------- */
+const nmId=n=>BNAME.indexOf(n);
+let TALLG=0,FLORA=[];
+TALLG=nmId('Grama Alta');FLORA=['Papoula','Dente-de-leão','Centáurea','Margarida','Orquídea Azul','Alho-ornamental','Tulipa Vermelha','Tulipa Rosa','Tulipa Branca','Tulipa Laranja','Houstônia','Lírio-do-vale'].map(nmId).filter(i=>i>0);
+
 const chunks=new Map();const ck=(cx,cz)=>(cx+32768)*65536+(cz+32768);
 let edits={};let dirtySave=false;
 const cidx=(x,y,z)=>x+CH*(z+CH*y);
 function getB(x,y,z){if(y<0)return BEDROCK;if(y>=H)return 0;const c=chunks.get(ck(x>>4,z>>4));return c?c.d[cidx(x&15,y,z&15)]:0}
 function heightAt(x,z){const c=fbm2(x*.0035,z*.0035,SEED,3),m=fbm2(x*.02,z*.02,SEED+50,4),e=Math.max(0,c-.58);return clamp(Math.floor(SEA+(c-.42)*55+(m-.5)*16+e*e*400),3,H-6)}
 function genChunk(cx,cz){
- const d=new Uint8Array(CH*H*CH),hm=new Int16Array(256);
+ const d=new Uint16Array(CH*H*CH),hm=new Int16Array(256);
  for(let z=0;z<16;z++)for(let x=0;x<16;x++){
   const wx=cx*16+x,wz=cz*16+z,h=heightAt(wx,wz);hm[x+z*16]=h;const beach=h<=SEA+1,snowy=h>=46;
   for(let y=0;y<=h;y++){let id;
@@ -206,6 +227,8 @@ function genChunk(cx,cz){
     for(let dx=-r;dx<=r;dx++)for(let dz=-r;dz<=r;dz++){
      if(Math.abs(dx)===r&&Math.abs(dz)===r&&hash(wx+dx,dy,wz+dz,SEED+5)<.5)continue;
      if(dx===0&&dz===0&&dy<=th)continue;setL(x+dx,h+dy,z+dz,LEAVES,true)}}
+  }else if(top===GRASS&&h>SEA+1&&h<48&&FLORA.length&&hash(wx,6,wz,SEED+8)<.07){
+   const r=hash(wx,7,wz,SEED+10);setL(x,h+1,z,r<.72?TALLG:FLORA[(r*997|0)%FLORA.length],true)
   }else if(top===SAND&&h>SEA+1&&hash(wx,4,wz,SEED+4)<.006){
    const ch=1+(hash(wx,5,wz,SEED+6)*3|0);for(let y=h+1;y<=h+ch;y++)setL(x,y,z,CACTUS)}
  }
@@ -224,16 +247,18 @@ FACES.forEach(f=>{const c=f.c,a=[c[1][0]-c[0][0],c[1][1]-c[0][1],c[1][2]-c[0][2]
  f.na=f.d[0]?0:f.d[1]?1:2;f.ta=[0,1,2].filter(i=>i!==f.na)});
 const TRI_A=[0,1,2,0,2,3],TRI_B=[1,2,3,1,3,0];
 function order(ccw,flip){const o=flip?TRI_B:TRI_A;return ccw?o:[o[0],o[2],o[1],o[3],o[5],o[4]]}
-const AOM=[.5,.68,.84,1],E=.0006,TS=1/16;
-function uvOf(t){const u0=(t%16)*TS+E,v0=(t>>4)*TS+E;return[u0,v0,u0+TS-2*E,v0+TS-2*E]}
+const AOM=[.5,.68,.84,1],E=.12/1024,TS=1/AW;
+function uvOf(t){const TV=16/atlas.height,u0=(t%AW)*TS+E,v0=Math.floor(t/AW)*TV+E;return[u0,v0,u0+TS-2*E,v0+TV-2*E]}
 function buildMesh(ch){
  const ox=ch.cx*16,oz=ch.cz*16,d=ch.d,O=[],W=[];
  const g=(x,y,z)=>{if(y<0)return BEDROCK;if(y>=H)return 0;if(x>=0&&x<16&&z>=0&&z<16)return d[cidx(x,y,z)];return getB(ox+x,y,oz+z)};
  const q=[0,0,0,0];
  for(let y=0;y<H;y++)for(let z=0;z<16;z++)for(let x=0;x<16;x++){
   const id=d[cidx(x,y,z)];if(!id)continue;const tl=TILES[id];if(!tl)continue;const isW=id===WATER;
+  if(CROSS[id]){const uv=uvOf(tl[0]),X=ox+x,Z=oz+z,Y=y,s=.95;[[.12,.12,.88,.88],[.88,.12,.12,.88]].forEach(p=>{[0,1].forEach(sd=>{const a=sd?[p[2],p[3]]:[p[0],p[1]],b=sd?[p[0],p[1]]:[p[2],p[3]];
+   O.push(X+a[0],Y,Z+a[1],uv[0],uv[3],s,X+b[0],Y,Z+b[1],uv[2],uv[3],s,X+b[0],Y+1,Z+b[1],uv[2],uv[1],s,X+a[0],Y,Z+a[1],uv[0],uv[3],s,X+b[0],Y+1,Z+b[1],uv[2],uv[1],s,X+a[0],Y+1,Z+a[1],uv[0],uv[1],s)})});continue}
   for(let fi=0;fi<6;fi++){const f=FACES[fi],bx=x+f.d[0],by=y+f.d[1],bz=z+f.d[2],n=g(bx,by,bz);
-   if(OPQ[n])continue;if(n===id&&id!==LEAVES)continue;
+   if(OPQ[n])continue;if(n===id&&id!==LEAVES&&!FANCY[id])continue;
    const uv=uvOf(tl[f.t]),out=isW?W:O,pos=[bx,by,bz];
    let top=1;if(isW)top=g(x,y+1,z)===WATER?1:.88;
    for(let k=0;k<4;k++){
@@ -306,7 +331,20 @@ const crackBufs=[];for(let s=0;s<10;s++)crackBufs.push(upl(cubeData(()=>[s/10,0,
 const lineBuf=(function(){const o=[],a=-.004,b=1.004,P=[[a,a,a],[b,a,a],[b,a,b],[a,a,b],[a,b,a],[b,b,a],[b,b,b],[a,b,b]],E=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
  E.forEach(e=>e.forEach(i=>o.push(P[i][0],P[i][1],P[i][2],0,0,0)));return upl(new Float32Array(o))})();
 let heldId=GRASS,heldBuf=null;
-function buildHeld(){if(heldBuf)gl.deleteBuffer(heldBuf.b);const t=TILES[heldId]||TILES[STONE];heldBuf=upl(cubeData(fi=>uvOf(t[FACES[fi].t]),-.5,-.5,-.5,1,1,1))}
+function itemMesh(tile){const o=[],cx=(tile%AW)*16,cy=Math.floor(tile/AW)*16,d=actx.getImageData(cx,cy,16,16).data,op=(x,y)=>x>=0&&x<16&&y>=0&&y<16&&d[(y*16+x)*4+3]>40,AH=atlas.height;
+ const Z0=-.035,Z1=.035;
+ const q=(a,b,c,dd,u,v,sh)=>{[a,b,c,a,c,dd].forEach(p=>o.push(p[0],p[1],p[2],u,v,sh))};
+ for(let y=0;y<16;y++)for(let x=0;x<16;x++){if(!op(x,y))continue;
+  const X0=x/16-.5,X1=(x+1)/16-.5,Y1=.5-y/16,Y0=.5-(y+1)/16,u=(cx+x+.5)/AWPX,v=(cy+y+.5)/AH;
+  q([X0,Y0,Z1],[X1,Y0,Z1],[X1,Y1,Z1],[X0,Y1,Z1],u,v,1);
+  q([X1,Y0,Z0],[X0,Y0,Z0],[X0,Y1,Z0],[X1,Y1,Z0],u,v,.8);
+  if(!op(x-1,y))q([X0,Y0,Z0],[X0,Y0,Z1],[X0,Y1,Z1],[X0,Y1,Z0],u,v,.7);
+  if(!op(x+1,y))q([X1,Y0,Z1],[X1,Y0,Z0],[X1,Y1,Z0],[X1,Y1,Z1],u,v,.7);
+  if(!op(x,y-1))q([X0,Y1,Z1],[X1,Y1,Z1],[X1,Y1,Z0],[X0,Y1,Z0],u,v,.9);
+  if(!op(x,y+1))q([X0,Y0,Z0],[X1,Y0,Z0],[X1,Y0,Z1],[X0,Y0,Z1],u,v,.6)}
+ return upl(new Float32Array(o))}
+function buildHeld(){if(heldBuf)gl.deleteBuffer(heldBuf.b);const t=TILES[heldId]||TILES[STONE];heldBuf=ISFLAT(heldId)?itemMesh(t[0]):upl(cubeData(fi=>uvOf(t[FACES[fi].t]),-.5,-.5,-.5,1,1,1))}
+
 buildHeld();
 /* ---------- personagem (skin 64x64 desenhada no código) ---------- */
 const skin=document.createElement('canvas');skin.width=64;skin.height=64;
@@ -363,12 +401,12 @@ function animUpdate(dt){
  const A=PAN,sp=Math.hypot(P.vx,P.vz),swim=P.water&&!P.fly,air=!P.ground&&!P.fly&&!swim;
  A.gq+=((P.ground?1:0)-A.gq)*Math.min(1,dt*10);PV.g=A.gq;PQ.L=timeNow;
  if(air){A.airT+=dt;A.fallV=Math.min(A.fallV,P.vy)}
- else{if(A.airT>.25&&A.fallV<-5&&P.ground){const r=sp>2;A.landT=0;A.landLen=PANIM[r?'landrun':'land'].len;A.landName=r?'landrun':'land'}A.airT=0;A.fallV=0}
+ else{if(A.airT>.25&&A.fallV<-5&&P.ground&&!P.sneakJ){const r=sp>2;A.landT=0;A.landLen=PANIM[r?'landrun':'land'].len;A.landName=r?'landrun':'land'}A.airT=0;A.fallV=0}
  A.landT+=dt;
  const fx=-Math.sin(P.byaw),fz=-Math.cos(P.byaw),dot=sp>.01?(P.vx*fx+P.vz*fz)/sp:1;
  let mode='idle';
  if(swim)mode=sp>.6?'swim':'idle';
- else if(P.fly)mode='idle';
+ else if(P.fly)mode='fly';
  else if(air&&A.airT>.1)mode=P.vy>.5?'jump':'fall';
  else if(A.landT<A.landLen)mode='land';
  else if(P.sneak)mode=sp>.3?'sneakwalk':'sneak';
@@ -382,6 +420,7 @@ function animUpdate(dt){
  else if(mode==='back')loco('back',4.3,.4,1.5);
  else if(mode==='run')loco('run',5.8,.5,1.4);
  else if(mode==='sneakwalk')loco('sneakwalk',1.9,.4,1.5);
+ else if(mode==='fly'){T=animPose('fall',.9,newPose());T.root=[0,0,0,0,0,0,1,1,1];T.waist[0]+=Math.min(40,sp*3.5)}
  else if(mode==='sneak')T=animPose('sneak',clampT('sneak',A.ot),newPose());
  else if(mode==='jump')T=animPose('jump',clampT('jump',A.ot),newPose());
  else if(mode==='fall')T=animPose('fall',clampT('fall',A.ot),newPose());
@@ -406,7 +445,7 @@ function drawPlayer(px,py,pz,byaw,hyaw,pitch,pose,swing){
  const wc=chain(rp,'waist'),wp=down(wc,'waist');
  const bc=chain(wp,'body'),bp=down(bc,'body');
  draw(bc,'body',PM.body);
- const hc=chain(wp,'head',pitch,hyaw);draw(hc,'head',PM.head);
+ const hc=chain(bp,'head',pitch,hyaw);draw(hc,'head',PM.head);
  const rac=chain(bp,'rightArm',armX);draw(rac,'rightArm',PM.rArm);
  const lac=chain(bp,'leftArm');draw(lac,'leftArm',PM.lArm);
  draw(chain(rp,'rightLeg'),'rightLeg',PM.rLeg);
@@ -484,7 +523,7 @@ function addItem(id){INV[id]=(INV[id]||0)+1;if(!HOT.includes(id)){const e=HOT.in
 function doBreak(t){const id=t.id;if(id===BEDROCK)return;setB(t.x,t.y,t.z,0,true);spawnParts(t.x,t.y,t.z,id,18);snd('break');swingT=0;if(SET.mode==='survival')addItem(DROP[id]||id)}
 function placeBlock(){
  swingT=0;if(!target)return;const id=curId();if(!id)return;if(SET.mode==='survival'&&!(INV[id]>0))return;
- const x=target.x+target.nx,y=target.y+target.ny,z=target.z+target.nz;if(y<0||y>=H)return;const cur=getB(x,y,z);if(cur&&!LIQ[cur])return;
+ const x=target.x+target.nx,y=target.y+target.ny,z=target.z+target.nz;if(y<0||y>=H)return;const cur=getB(x,y,z);if(cur&&!LIQ[cur]&&!CROSS[cur])return;if(ISITEM(id))return;
  if(SOLID[id]){const hw=.3;if(x+1>P.x-hw&&x<P.x+hw&&z+1>P.z-hw&&z<P.z+hw&&y+1>P.y&&y<P.y+1.8)return}
  setB(x,y,z,id,true);snd('place');if(SET.mode==='survival'){INV[id]--;if(INV[id]<=0){delete INV[id];if(!(INV[id]>0)){const i=HOT.indexOf(id);if(i>=0)HOT[i]=0}}refreshUI()}}
 function interact(dt){
@@ -497,7 +536,8 @@ function interact(dt){
  if(swingT<1)swingT+=dt*3.6}
 /* ---------- ícones / interface ---------- */
 function icon(cv,id){const c=cv.getContext('2d');cv.width=cv.height=48;c.clearRect(0,0,48,48);const t=TILES[id];if(!t)return;c.imageSmoothingEnabled=false;
- const s=48,k=s/32,src=i=>[(i%16)*16,(i>>4)*16,16,16];
+ if(ISFLAT(id)){const i=t[0];c.drawImage(atlas,(i%AW)*16,Math.floor(i/AW)*16,16,16,2,2,44,44);return}
+ const s=48,k=s/32,src=i=>[(i%AW)*16,Math.floor(i/AW)*16,16,16];
  const dr=(i,m)=>{c.save();c.setTransform(m[0],m[1],m[2],m[3],m[4],m[5]);const r=src(i);c.drawImage(atlas,r[0],r[1],16,16,0,0,16,16);c.restore()};
  dr(t[2],[k,k/2,-k,k/2,s/2,0]);dr(t[4],[k,k/2,0,k,0,s/4]);dr(t[0],[k,-k/2,0,k,s/2,s/2]);
  c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.moveTo(0,s/4);c.lineTo(s/2,s/2);c.lineTo(s/2,s);c.lineTo(0,s*.75);c.fill();
@@ -510,12 +550,21 @@ function refreshUI(){
  heldId=curId()||STONE;if(typeof heldBuf!=='undefined')buildHeld();
  $('bFly').style.display=SET.mode==='creative'?'flex':'none';$('bFly').classList.toggle('on',P.fly);$('bDown').style.display=P.fly?'flex':'none'}
 function selSlot(i){sel=(i+9)%9;refreshUI();const id=curId();if(id)toast(BNAME[id])}
-function openInv(){const g=$('grid');g.innerHTML='';const list=SET.mode==='creative'?PLACEABLE:Object.keys(INV).map(Number);
- if(!list.length){g.textContent='Você ainda não coletou blocos.'}
- list.forEach(id=>{const d=document.createElement('div');d.className='slot';const c=document.createElement('canvas');icon(c,id);d.appendChild(c);
+let invTab='b',invQ='',invList=[],invN=0;
+function invCalc(){const q=invQ.trim().toLowerCase(),cr=SET.mode==='creative';
+ let L=invTab==='b'?(cr?PLACEABLE:Object.keys(INV).map(Number).filter(i=>!ISITEM(i))):(cr?ITEMLIST:Object.keys(INV).map(Number).filter(ISITEM));
+ if(q)L=L.filter(id=>(BNAME[id]||'').toLowerCase().includes(q));invList=L}
+function invMore(){const g=$('grid');const end=Math.min(invList.length,invN+120);
+ for(;invN<end;invN++){const id=invList[invN],d=document.createElement('div');d.className='slot';d.title=BNAME[id];const c=document.createElement('canvas');icon(c,id);d.appendChild(c);
   if(SET.mode==='survival'){const b=document.createElement('b');b.textContent=INV[id];d.appendChild(b)}
-  d.onclick=()=>{HOT[sel]=id;refreshUI();toast(BNAME[id])};g.appendChild(d)});
- $('invP').style.display='flex';paused=true;releaseLook()}
+  d.onclick=()=>{HOT[sel]=id;refreshUI();toast(BNAME[id])};g.appendChild(d)}}
+function renderInv(){const g=$('grid');g.innerHTML='';invCalc();invN=0;$('invCard').scrollTop=0;
+ if(!invList.length){g.textContent=SET.mode==='survival'?'Nada coletado aqui ainda.':'Nada encontrado.'}else invMore();
+ $('tabB').className='mb'+(invTab==='b'?'':' alt');$('tabI').className='mb'+(invTab==='i'?'':' alt')}
+function openInv(){renderInv();$('invP').style.display='flex';paused=true;releaseLook()}
+$('tabB').onclick=()=>{invTab='b';renderInv()};$('tabI').onclick=()=>{invTab='i';renderInv()};
+$('invQ').oninput=e=>{invQ=e.target.value;renderInv()};
+$('invCard').addEventListener('scroll',e=>{const c=e.target;if(c.scrollTop+c.clientHeight>c.scrollHeight-300&&invN<invList.length)invMore()});
 function closeInv(){$('invP').style.display='none';paused=false}
 function openMenu(){syncMenu();$('menuP').style.display='flex';paused=true;saveWorld();releaseLook();breaking=false}
 function closeMenu(){$('menuP').style.display='none';paused=false;saveSet()}
@@ -574,7 +623,8 @@ function drawHand(light){
  let m=mmul(mT(.42+bx-.12*b,-.36+by+id-.12*b,-.40-.18*b),mmul(mRy(.45),mmul(mRz(-.15),mmul(mRx(1.25+a*.9),mS(SC*1.05,SC*1.05,SC*1.05)))));
  gl.uniformMatrix4fv(U.uM,false,m);drawB(PM.rArm);
  if(curId()){gl.bindTexture(gl.TEXTURE_2D,texAtlas);
-  m=mmul(mT(.36+bx-.12*b,-.27+by+id-.16*b,-.62-.22*b),mmul(mRy(.75),mmul(mRx(.25-a*.6),mS(.2,.2,.2))));gl.uniformMatrix4fv(U.uM,false,m);drawB(heldBuf)}
+  if(ISFLAT(curId())){gl.disable(gl.CULL_FACE);m=mmul(mT(.34+bx-.12*b,-.18+by+id-.16*b,-.58-.22*b),mmul(mRy(-.55),mmul(mRz(.5),mmul(mRx(.35-a*.7),mS(.3,.3,.3)))));gl.uniformMatrix4fv(U.uM,false,m);drawB(heldBuf);gl.enable(gl.CULL_FACE)}
+  else{m=mmul(mT(.36+bx-.12*b,-.27+by+id-.16*b,-.62-.22*b),mmul(mRy(.75),mmul(mRx(.25-a*.6),mS(.2,.2,.2))));gl.uniformMatrix4fv(U.uM,false,m);drawB(heldBuf)}}
  gl.uniformMatrix4fv(U.uM,false,mI())}
 function sunMoon(view,a){
  const proj=(d)=>{const x=VP[0]*d[0]+VP[4]*d[1]+VP[8]*d[2],y=VP[1]*d[0]+VP[5]*d[1]+VP[9]*d[2],w=VP[3]*d[0]+VP[7]*d[1]+VP[11]*d[2];return w>0.01?[(x/w*.5+.5)*innerWidth,(1-(y/w*.5+.5))*innerHeight]:null};
@@ -682,9 +732,14 @@ async function importPack(file){
 $('mTex').onclick=()=>{$('file').value='';$('file').click()};
 $('file').onchange=async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;closeMenu();toast('Lendo pacote de texturas…');
  try{const n=await importPack(f);toast(n+' texturas aplicadas')}catch(err){toast('Erro: '+err.message)}};
-$('mTexReset').onclick=()=>{for(const k in OVER)delete OVER[k];localStorage.removeItem('oasis_tex');applyOver();closeMenu();toast('Texturas originais restauradas')};
+$('mTexReset').onclick=()=>{for(const k in OVER)delete OVER[k];localStorage.removeItem('oasis_tex');applyOver();closeMenu();toast('Texturas importadas removidas')};
 (function loadTex(){try{const s=JSON.parse(localStorage.getItem('oasis_tex')||'null');if(!s)return;let left=Object.keys(s).length;
  Object.keys(s).forEach(t=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=c.height=16;c.getContext('2d').drawImage(im,0,0,16,16);OVER[t]=c;if(--left===0)applyOver()};im.onerror=()=>{--left};im.src=s[t]})}catch(e){}})();
+/* ---------- pacote Actions And Stuff: atlas e texturas dos blocos originais ---------- */
+(function(){if(!TP.atlas)return;const im=new Image();im.onload=()=>{packImg=im;
+  const tc=i=>{const c=document.createElement('canvas');c.width=c.height=16;c.getContext('2d').drawImage(im,(i%AW)*16,Math.floor(i/AW)*16,16,16,0,0,16,16);return c};
+  for(const k in TP.orig)PACKO[k]=tc(TP.orig[k]);
+  paintAtlas(OVER);reloadAtlas()};im.src=TP.atlas})();
 /* ---------- início ---------- */
 function start(){
  let w=null;try{w=JSON.parse(localStorage.getItem('oasis_world')||'null')}catch(e){}
