@@ -1,7 +1,5 @@
-#id 2026-10-17-c
-#titulo Animações corrigidas + blocos e itens do Actions And Stuff
-- Animações refeitas: cabeça presa ao corpo, movimentos fluidos, pose de voo, nado, agachar com Shift
-- Mais de 400 blocos novos (plantas, flores, minérios, lãs, concretos e mais) e 700+ itens
-- Inventário com abas Blocos/Itens e busca por nome
-- Itens aparecem 3D na mão; plantas e flores nascem no mundo
-- Texturas dos blocos originais agora vêm do pacote
+#id 2026-10-17-d
+#titulo Animações e braço no estilo Minecraft
+- Corpo refeito com as proporções e fórmulas do Minecraft: andar, correr, agachar e bater sem torção nem inclinação estranha
+- Braço em 1ª pessoa refeito: posição, balanço ao andar e soco ao bater como no jogo original
+- Blocos e itens agora ficam na mão do jeito certo (espada, picareta e blocos)
