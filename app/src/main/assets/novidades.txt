@@ -1,8 +1,5 @@
-#id 2026-10-17-a
-#titulo Primeira versão do Oasis
-- Mundo infinito de blocos gerado na hora, com montanhas, lagos, cavernas, minérios e árvores
-- Câmera em 1ª pessoa, 3ª pessoa (atrás) e 3ª pessoa (frente) com o personagem animado
-- Quebrar e colocar blocos com rachaduras, partículas, sons e a mão balançando
-- Modos Criativo (voar) e Sobrevivência (coletar blocos)
-- Ciclo de dia e noite, água para nadar e salvamento automático
-- Importar pacote de texturas (.mcpack ou .zip) nas Configurações
+#id 2026-10-17-b
+#titulo Novas animações do personagem
+- Animações do addon Actions And Stuff: andar, correr, andar de costas, pular, cair, aterrissar e nadar
+- Agachar com Shift (fica mais lento) com animação de agachar e andar agachado
+- Transição suave entre as animações e movimento de respiração parado
